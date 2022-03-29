@@ -1,5 +1,5 @@
-const { User } = require('../models/user')
 const { parsed: { SECRET_KEY } } = require('dotenv').config();
+const { User } = require('../models/userSchema');
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const auth = require('./auth');
@@ -55,6 +55,7 @@ router.post('/login', async (req, res) => {
 }
 );
 
+//follow a particular user
 router.post('/follow/:id', auth, async (req, res) => {
     try {
         const { email: currentUserEmail } = req.user;
@@ -66,6 +67,8 @@ router.post('/follow/:id', auth, async (req, res) => {
             res.status(400).send('You are already following this user');
         currentUser.followings.push(userToFollow.id);
         userToFollow.followers.push(currentUser.id);
+        currentUser.save();
+        userToFollow.save();
         res.status(200).send("Successfully followed user");
     } catch (err) {
         res.status(500).send("Internal server error");
@@ -73,16 +76,39 @@ router.post('/follow/:id', auth, async (req, res) => {
 
 })
 
-//Post a new user to db
-router.post('/user', (req, res) => {
+//unfollow a particular user
+router.post('/unfollow/:id', auth, async (req, res) => {
+    try {
+        const { email: currentUserEmail } = req.user;
+        const currentUser = await User.findOne({ email: currentUserEmail });
+        const userToFollow = await User.findById(req.params.id);
+        if (currentUser.id === userToFollow.id)
+            res.status(400).send('You cannot unfollow yourself');
+        if (!await currentUser.followings.includes(userToFollow.id))
+            res.status(400).send('You are not following this user');
+        currentUser.followings.pull(userToFollow.id);
+        userToFollow.followers.pull(currentUser.id);
+        currentUser.save();
+        userToFollow.save();
+        res.status(200).send("Successfully unfollowed user");
+    } catch (err) {
+        res.status(500).send("Internal server error");
+    }
 
-    const userExists = User.findOne({ email: req.body.email });
-    const user = new User(req.body);
-    User(req.body).save().then(
-        users => {
-            res.json(users)
-        }
-    ).catch(err => res.status(400).json('Error! '))
+})
+
+//Post a new user to db
+router.get('/user', auth, async (req, res) => {
+    try {
+        const { email: currentUserEmail } = req.user;
+        const currentUser = await User.findOne({ email: currentUserEmail });
+        if (!currentUser) res.statusCode(401).send('Unauthorized');
+        const { password, __v, ...userDetails } = currentUser._doc;
+        res.status(200).json({ ...userDetails });
+    }
+    catch (err) {
+        res.status(500).send("Internal server error");
+    }
 });
 
 

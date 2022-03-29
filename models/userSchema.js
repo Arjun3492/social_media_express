@@ -10,5 +10,4 @@ const userSchema = new Schema({
     { timestamp: true }
 )
 
-
 exports.User = mongoose.model('User', userSchema)
